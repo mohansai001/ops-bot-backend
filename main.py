@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from database import connect_to_retool,get_candidates_db,get_dashboard,get_rrf_details
+from database import connect_to_retool,get_candidates_db,get_dashboard,get_rrf_details,update_associate_status,update_rrf_status,insert_into_allocation_table
 
 # Create FastAPI instance
 app = FastAPI()
@@ -48,10 +48,15 @@ def get_all_details():
     rrf_details = get_rrf_details()
     return {"bench_details": bench_details, "rrf_details": rrf_details}
 
-@app.post("/update_position/{rrf_id}")
-def update_position(rrf_id: str):
-    # Logic to update the position for the given rrf_id
-    return {"message": f"Position updated for RRF ID: {rrf_id}"}
+@app.post("/update_position/{rrf_id}/{vam_id}")
+def update_position(rrf_id: str, vam_id: str):
+    rrf_status=update_rrf_status(rrf_id)
+    associate_status=update_associate_status(vam_id)
+    # Logic to update the position for the given rrf_id and vam_id
+    if rrf_status and associate_status:
+        insert_into_allocation_table(rrf_id, vam_id)
+        return {"message": f"Position updated for RRF ID: {rrf_id} and VAM ID: {vam_id}"}
+    return {"message": f"Failed to update position for RRF ID: {rrf_id} and VAM ID: {vam_id}"}
 
 # Run the application
 if __name__ == "__main__":

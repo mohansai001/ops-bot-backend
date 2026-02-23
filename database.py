@@ -22,7 +22,7 @@ def get_candidates_db():
         # print("=============")
         # print(conn)
         cursor = conn.cursor()
-        cursor.execute("SELECT * FROM bench;")
+        cursor.execute("SELECT * FROM bench WHERE allocation_status = 'BB';")
         candidates = cursor.fetchall()
         print(candidates)
         dict_candidates=[]
@@ -63,7 +63,77 @@ def get_candidates_db():
         if 'conn' in locals():
             conn.close()
         return {}
+
+def candidate_by_id(vam_id: str):
+    try:
+        conn=connect_to_retool()
+        cursor=conn.cursor()
+        cursor.execute("SELECT * FROM bench WHERE vamid = %s;", (vam_id,))
+        candidate = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if candidate:
+            return {
+                "vamid": candidate[1],
+                "name": candidate[2],
+                # "joining_date": candidate[3],
+                "grade": candidate[4],
+                # "tsc": candidate[5],
+                # "account": candidate[6],
+                # "project": candidate[7],
+                # "allocation_status": candidate[8],
+                # "allocation_start_date": candidate[9],
+                # "allocation_end_date": candidate[10],
+                # "first_level_manager": candidate[11],
+                "designation": candidate[12],
+                "email": candidate[13],
+                # "sub_dept": candidate[14],
+                # "relieving_date": candidate[15],
+                # "resigned_on": candidate[16],
+                # "resignation_status": candidate[17],
+                # "second_level_manager": candidate[18],
+                # "current_skill": candidate[19],
+                # "primary_skill": candidate[20],
+                # "vam_exp": candidate[21],
+                # "total_exp": candidate[22],
+                # "account_summary": candidate[23],
+                # "resourcing_unit": candidate[24],
+                # "workspace": candidate[25],
+            }
+        return {}
+    except Exception as e:
+        print(f"Error retrieving candidate by ID: {e}")
+        if 'conn' in locals():
+            conn.close()
+        return {}
     
+def get_rrf_by_id(rrf_id):
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM rrf WHERE rrf_id = %s;", (rrf_id,))
+        rrf = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if rrf:
+            return {
+                "account": rrf[1] if len(rrf) > 1 else None,
+                "rrf_id": rrf[2] if len(rrf) > 2 else None,
+                # "created_on": rrf[3] if len(rrf) > 3 else None,
+                # "required_by": rrf[4] if len(rrf) > 4 else None,
+                "pos_title": rrf[5] if len(rrf) > 5 else None,
+                "role": rrf[6] if len(rrf) > 6 else None,
+                # "status": rrf[7] if len(rrf) > 7 else None,
+                # "tag_comments": rrf[8] if len(rrf) > 8 else None,
+                # "type": rrf[9] if len(rrf) > 9 else None,
+                # "project_name": rrf[10] if len(rrf) > 10 else None
+            }
+        return {}
+    except Exception as e:
+        print(f"Error retrieving RRF by ID: {e}")
+        if 'conn' in locals():
+            conn.close()
+        return {}
 
 def list_retool_tables():
     try:
@@ -90,13 +160,13 @@ def get_dashboard():
         cursor = conn.cursor()
 
         # Bench count
-        cursor.execute("SELECT COUNT(name) FROM bench;")
+        cursor.execute("SELECT COUNT(name) FROM bench WHERE allocation_status = 'BB';")
         bench_count = cursor.fetchone()[0]
         # print("===")
         # print(f"Bench count: {bench_count}")
 
         # Distinct RRF count
-        cursor.execute("SELECT COUNT(rrf_id) FROM rrf;")
+        cursor.execute("SELECT COUNT(rrf_id) FROM rrf WHERE status = 'Open';")
         rrf_count = cursor.fetchone()[0]
         # print(f"RRF count: {rrf_count}")
 
@@ -123,7 +193,7 @@ def get_rrf_details():
         conn = connect_to_retool()
         cursor = conn.cursor()
 
-        cursor.execute("SELECT * FROM rrf;")
+        cursor.execute("SELECT * FROM rrf WHERE status = 'Open';")
         rrf_details = cursor.fetchall()
 
         return [
@@ -166,6 +236,73 @@ def update_pos_id(id):
             conn.rollback()
             cursor.close()
             conn.close()
+
+
+def update_rrf_status(rrf_id: str):
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE rrf SET status = 'Closed' WHERE rrf_id = %s;", (rrf_id, ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Updated RRF status for RRF ID: {rrf_id}")
+        return True
+    except Exception as e:
+        print(f"Error updating RRF status: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            return False
+
+
+def update_associate_status(vamid: str):
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE bench SET allocation_status = 'BP' WHERE vamid = %s;", (vamid,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Updated associate status for ID: {vamid}")
+        return True
+    except Exception as e:
+        print(f"Error updating associate status: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            cursor.close()
+            conn.close()
+        return False
+
+def insert_into_allocation_table(rrf_id: str, vam_id: str):
+    try:
+        associate_details = candidate_by_id(vam_id)
+        rrf_details = get_rrf_by_id(rrf_id)
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO allocation_table (vamid,name,grade,designation,email,account,rrf_id,pos_title,role) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
+            associate_details.get("vamid"),
+            associate_details.get("name"),
+            associate_details.get("grade"),
+            associate_details.get("designation"),
+            associate_details.get("email"),
+            associate_details.get("account"),
+            rrf_details.get("rrf_id"),
+            rrf_details.get("pos_title"),
+            rrf_details.get("role")
+        ))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print(f"Inserted into allocation table for RRF ID: {rrf_id} and VAM ID: {vam_id}")
+    except Exception as e:
+        print(f"Error inserting into allocation table: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            cursor.close()
+            conn.close()
+
 
 if __name__ == "__main__":
     # Only run this when the script is executed directly, not when imported
