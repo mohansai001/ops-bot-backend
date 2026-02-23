@@ -279,6 +279,7 @@ def insert_into_allocation_table(rrf_id: str, vam_id: str):
     try:
         associate_details = candidate_by_id(vam_id)
         rrf_details = get_rrf_by_id(rrf_id)
+        # print(rrf_details.get("account"))
         conn = connect_to_retool()
         cursor = conn.cursor()
         cursor.execute("INSERT INTO allocation_table (vamid,name,grade,designation,email,account,rrf_id,pos_title,role) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);", (
