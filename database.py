@@ -287,7 +287,7 @@ def insert_into_allocation_table(rrf_id: str, vam_id: str):
             associate_details.get("grade"),
             associate_details.get("designation"),
             associate_details.get("email"),
-            associate_details.get("account"),
+            rrf_details.get("account"),
             rrf_details.get("rrf_id"),
             rrf_details.get("pos_title"),
             rrf_details.get("role")
