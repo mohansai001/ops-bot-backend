@@ -6,8 +6,8 @@ import google.generativeai as genai
 import os
 import json
 from typing import Dict, Any
-from openai import AzureOpenAI
-from pydantic import BaseModel
+# from openai import AzureOpenAI
+
 
 
 app = FastAPI()
@@ -32,42 +32,42 @@ app.add_middleware(
 # Create a simple endpoint that returns "Hello World"
 
 
-def get_azure_response(text):
-    try:
-        endpoint = "https://defaultresourcegroup-ccan-resource-0475.cognitiveservices.azure.com/"
-        deployment = "gpt-4.1-mini-312634"
-        subscription_key = os.environ.get("AZURE_AI_API_KEY")
-        api_version = "2024-12-01-preview"
+# def get_azure_response(text):
+#     try:
+#         endpoint = "https://defaultresourcegroup-ccan-resource-0475.cognitiveservices.azure.com/"
+#         deployment = "gpt-4.1-mini-312634"
+#         subscription_key = os.environ.get("AZURE_AI_API_KEY")
+#         api_version = "2024-12-01-preview"
  
-        if not subscription_key:
-            return "Error: AZURE_OPENAI_KEY not found in environment variables"
+#         if not subscription_key:
+#             return "Error: AZURE_OPENAI_KEY not found in environment variables"
  
-        client = AzureOpenAI(
-            api_version=api_version,
-            azure_endpoint=endpoint,
-            api_key=subscription_key,
-        )
+#         client = AzureOpenAI(
+#             api_version=api_version,
+#             azure_endpoint=endpoint,
+#             api_key=subscription_key,
+#         )
  
-        response = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a helpful assistant.",
-                },
-                {
-                    "role": "user",
-                    "content": text,
-                }
-            ],
-            max_tokens=1000,
-            temperature=0.7,
-            model=deployment
-        )
+#         response = client.chat.completions.create(
+#             messages=[
+#                 {
+#                     "role": "system",
+#                     "content": "You are a helpful assistant.",
+#                 },
+#                 {
+#                     "role": "user",
+#                     "content": text,
+#                 }
+#             ],
+#             max_tokens=1000,
+#             temperature=0.7,
+#             model=deployment
+#         )
  
-        return response.choices[0].message.content
-    except Exception as e:
-        # AI_ERROR_COUNT.labels(model='azure', error_type=type(e).__name__).inc()
-        return f"Azure Error: {str(e)}"
+#         return response.choices[0].message.content
+#     except Exception as e:
+#         # AI_ERROR_COUNT.labels(model='azure', error_type=type(e).__name__).inc()
+#         return f"Azure Error: {str(e)}"
  
 
 
