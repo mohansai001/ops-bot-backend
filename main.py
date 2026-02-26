@@ -116,6 +116,7 @@ def call_gemini_api(df1: pd.DataFrame, df2: pd.DataFrame) -> Dict[str, Any]:
                 {{
                     "rrf_id": "string",
                     "pos_title": "string",
+                    "account": "string",
                     "recommended_candidates": [
                         {{
                             "vamid": "string",
@@ -246,27 +247,43 @@ def update_position(rrf_id: str, vam_id: str):
 @app.get("/matching")
 def get_matching_candidates():
     try:
+        # Fetch data
         bench = get_candidates_db()
         rrf = get_rrf_details()
 
+        # Create DataFrames
         df1 = pd.DataFrame(bench)
         df2 = pd.DataFrame(rrf)
 
+        # Minimal columns for Gemini
         df1_update = df1[['vamid', 'grade', 'designation', 'current_skill', 'primary_skill']]
-        df2 = df2[['rrf_id', 'pos_title', 'role', 'account']]
+        df2_update = df2[['rrf_id', 'pos_title', 'role', 'account']]
 
         # Call Gemini
-        gemini_response = call_gemini_api(df1_update, df2)
+        gemini_response = call_gemini_api(df1_update, df2_update)
 
-        # Build employee lookup
+        # Build employee lookup (vamid → full employee details)
         employee_lookup = (
             df1
             .set_index("vamid")
             .to_dict(orient="index")
         )
 
-        # Enrich response
-        for match in gemini_response["gemini_analysis"]["matches"]:
+        # Build RRF lookup (rrf_id → full RRF details)
+        rrf_lookup = (
+            df2_update
+            .set_index("rrf_id")
+            .to_dict(orient="index")
+        )
+
+        # Enrich Gemini response
+        for match in gemini_response.get("gemini_analysis", {}).get("matches", []):
+            rrf_id = match.get("rrf_id")
+
+            # Attach RRF details below rrf_id
+            match["rrf_details"] = rrf_lookup.get(rrf_id)
+
+            # Attach employee details for each candidate
             for candidate in match.get("recommended_candidates", []):
                 vamid = candidate.get("vamid")
                 candidate["employee_details"] = employee_lookup.get(vamid)
@@ -277,28 +294,78 @@ def get_matching_candidates():
 
     except Exception as e:
         print(f"Error in matching: {e}")
-        return {"error": "An error occurred while processing the request"}
-
-
-@app.post("/gemini/analyze")
-async def analyze_with_gemini(prompt: str):
-    """
-    Direct endpoint to test Gemini API with custom prompts.
-    """
-    try:
-        if not GEMINI_API_KEY:
-            raise HTTPException(status_code=500, detail="Gemini API key not configured")
-        
-        model = genai.GenerativeModel('gemini-pro')
-        response = model.generate_content(prompt)
-        
         return {
-            "success": True,
-            "response": response.text,
-            "prompt": prompt
+            "error": "An error occurred while processing the request"
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error calling Gemini API: {str(e)}")
+
+# def get_matching_candidates():
+#     try:
+#         bench = get_candidates_db()
+#         rrf = get_rrf_details()
+
+#         df1 = pd.DataFrame(bench)
+#         df2 = pd.DataFrame(rrf)
+
+#         df1_update = df1[['vamid', 'grade', 'designation', 'current_skill', 'primary_skill']]
+#         df2 = df2[['rrf_id', 'pos_title', 'role', 'account']]
+
+#         # Call Gemini
+#         gemini_response = call_gemini_api(df1_update, df2)
+
+#         # Build employee lookup
+#         employee_lookup = (
+#             df1
+#             .set_index("vamid")
+#             .to_dict(orient="index")
+#         )
+
+#         rrf_lookup = (
+#             df2
+#             .set_index("rrf_id")
+#             .to_dict(orient="index")
+#         )
+
+#         # Build RRF lookup
+#         rrf_lookup = (
+#             df2
+#             .set_index("rrf_id")
+#             .to_dict(orient="index")
+#         )
+
+#         # Enrich response
+#         for match in gemini_response["gemini_analysis"]["matches"]:
+#             for candidate in match.get("recommended_candidates", []):
+#                 vamid = candidate.get("vamid")
+#                 candidate["employee_details"] = employee_lookup.get(vamid)
+
+#         return {
+#             "ai_matching": gemini_response
+#         }
+
+#     except Exception as e:
+#         print(f"Error in matching: {e}")
+#         return {"error": "An error occurred while processing the request"}
+
+
+# @app.post("/gemini/analyze")
+# async def analyze_with_gemini(prompt: str):
+#     """
+#     Direct endpoint to test Gemini API with custom prompts.
+#     """
+#     try:
+#         if not GEMINI_API_KEY:
+#             raise HTTPException(status_code=500, detail="Gemini API key not configured")
+        
+#         model = genai.GenerativeModel('gemini-pro')
+#         response = model.generate_content(prompt)
+        
+#         return {
+#             "success": True,
+#             "response": response.text,
+#             "prompt": prompt
+#         }
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error calling Gemini API: {str(e)}")
 
 
 
