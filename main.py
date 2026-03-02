@@ -1,11 +1,24 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from database import connect_to_retool,get_candidates_db,get_dashboard,get_rrf_details,update_associate_status,update_rrf_status,insert_into_allocation_table
+from database import (connect_to_retool,
+                      get_candidates_db,
+                      get_dashboard,
+                      get_rrf_details,
+                      update_associate_status,
+                      update_rrf_status,
+                      insert_into_allocation_table,
+                      insert_into_bench_table,
+                      insert_into_rrf_table,
+                      clear_bench_table,
+                      clear_rrf_table)
 import pandas as pd
 import google.generativeai as genai
 import os
 import json
-from typing import Dict, Any
+from typing import Dict, Any,Optional
+import pandas as pd
+import io
+
 # from openai import AzureOpenAI
 
 
@@ -173,6 +186,7 @@ def call_gemini_api(df1: pd.DataFrame, df2: pd.DataFrame) -> Dict[str, Any]:
             "success": False,
             "error": f"Failed to call Gemini API: {str(e)}"
         }
+    
 @app.get("/")
 async def read_root():
     return {"message": "Hello World"}
@@ -242,6 +256,266 @@ def update_position(rrf_id: str, vam_id: str):
 #     except Exception as e:
 #         print(f"Error in matching: {e}")
 #         return {"error": "An error occurred while processing the request"}
+
+
+
+
+@app.post("/upload-files")
+# async def upload_excel_files(
+#     bench_file: Optional[UploadFile] = File(None, description="Bench Excel file"),
+#     rrf_file: Optional[UploadFile] = File(None, description="RRF Excel file")
+# ):
+#     """
+#     Upload and process bench and/or RRF Excel files for AI-powered matching.
+#     """
+#     try:
+#         df_bench = None
+#         df_rrf = None
+#         response_files = {}
+
+#         # ---------- Bench File ----------
+#         if bench_file:
+#             if not bench_file.filename.endswith(('.xlsx', '.xls')):
+#                 raise HTTPException(
+#                     status_code=400,
+#                     detail="Bench file must be an Excel file (.xlsx or .xls)"
+#                 )
+
+#             bench_contents = pd.read_excel(bench_file.file)
+#             df_bench = pd.DataFrame(bench_contents)
+
+#             df_bench.columns = (
+#                 df_bench.columns
+#                     .str.strip()
+#                     .str.lower()
+#                     .str.replace(r'[^a-z0-9]+', '_', regex=True)
+#             )
+#             bench_flag=clear_bench_table()
+#             if bench_flag:
+#                 response=insert_into_bench_table(df_bench)
+#             response_files["bench_file"] = {
+#                 "filename": bench_file.filename,
+#                 "columns": df_bench.columns.tolist(),
+#                 # "total_candidates": len(df_bench),
+#                 "insert_response": response
+#             }
+
+#         # ---------- RRF File ----------
+#         if rrf_file:
+#             if not rrf_file.filename.endswith(('.xlsx', '.xls')):
+#                 raise HTTPException(
+#                     status_code=400,
+#                     detail="RRF file must be an Excel file (.xlsx or .xls)"
+#                 )
+
+#             rrf_contents = pd.read_excel(rrf_file.file)
+#             df_rrf = pd.DataFrame(rrf_contents)
+
+#             df_rrf.columns = (
+#                 df_rrf.columns
+#                     .str.strip()
+#                     .str.lower()
+#                     .str.replace(r'[^a-z0-9]+', '_', regex=True)
+#             )
+#             rrf_flag=clear_rrf_table()
+#             if rrf_flag:
+#                 response=insert_into_rrf_table(df_rrf)
+#             response_files["rrf_file"] = {
+#                 "filename": rrf_file.filename,
+#                 "insert_response": response
+#             }
+
+#         # ---------- No files uploaded ----------
+#         if not bench_file and not rrf_file:
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail="At least one file (bench or rrf) must be uploaded"
+#             )
+
+#         return {
+#             "success": True,
+#             "message": "File(s) processed successfully",
+#             "file_info": response_files
+#         }
+
+#     except HTTPException:
+#         raise
+#     except pd.errors.EmptyDataError:
+#         raise HTTPException(
+#             status_code=400,
+#             detail="One or more uploaded files are empty or corrupted"
+#         )
+#     except Exception as e:
+#         print(f"Error processing uploaded files: {e}")
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"Error processing files: {str(e)}"
+#         )
+
+
+@app.post("/upload-files")
+async def upload_excel_files(
+    bench_file: Optional[UploadFile] = File(None),
+    rrf_file: Optional[UploadFile] = File(None)
+):
+    """
+    Upload and process bench and/or RRF Excel files for AI-powered matching.
+    """
+    try:
+        df_bench = None
+        df_rrf = None
+        response_files = {}
+
+        # ---------- Bench File ----------
+        if bench_file and bench_file.filename:  # Check both file exists and has filename
+            if not bench_file.filename.endswith(('.xlsx', '.xls')):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Bench file must be an Excel file (.xlsx or .xls)"
+                )
+
+            bench_content = await bench_file.read()  # Use await here
+            df_bench = pd.read_excel(io.BytesIO(bench_content))
+
+            df_bench.columns = (
+                df_bench.columns
+                    .str.strip()
+                    .str.lower()
+                    .str.replace(r'[^a-z0-9]+', '_', regex=True)
+            )
+            bench_flag = clear_bench_table()
+            if bench_flag:
+                response = insert_into_bench_table(df_bench)
+            response_files["bench_file"] = {
+                "filename": bench_file.filename,
+                "columns": df_bench.columns.tolist(),
+                "insert_response": response
+            }
+
+        # ---------- RRF File ----------
+        if rrf_file and rrf_file.filename:  # Check both file exists and has filename
+            if not rrf_file.filename.endswith(('.xlsx', '.xls')):
+                raise HTTPException(
+                    status_code=400,
+                    detail="RRF file must be an Excel file (.xlsx or .xls)"
+                )
+
+            rrf_content = await rrf_file.read()  # Use await here
+            df_rrf = pd.read_excel(io.BytesIO(rrf_content))
+
+            df_rrf.columns = (
+                df_rrf.columns
+                    .str.strip()
+                    .str.lower()
+                    .str.replace(r'[^a-z0-9]+', '_', regex=True)
+            )
+            rrf_flag = clear_rrf_table()
+            if rrf_flag:
+                response = insert_into_rrf_table(df_rrf)
+            response_files["rrf_file"] = {
+                "filename": rrf_file.filename,
+                "insert_response": response
+            }
+
+        # ---------- No files uploaded ----------
+        if not (bench_file and bench_file.filename) and not (rrf_file and rrf_file.filename):
+            raise HTTPException(
+                status_code=400,
+                detail="At least one file (bench or rrf) must be uploaded"
+            )
+
+        return {
+            "success": True,
+            "message": "File(s) processed successfully",
+            "file_info": response_files
+        }
+
+    except HTTPException:
+        raise
+    except pd.errors.EmptyDataError:
+        raise HTTPException(
+            status_code=400,
+            detail="One or more uploaded files are empty or corrupted"
+        )
+    except Exception as e:
+        print(f"Error processing uploaded files: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing files: {str(e)}"
+        )
+
+# async def upload_excel_files(
+#     bench_file: UploadFile = File(..., description="Bench Excel file"),
+#     rrf_file: UploadFile = File(..., description="RRF Excel file")
+# ):
+#     """
+#     Upload and process bench and RRF Excel files for AI-powered matching.
+    
+#     Args:
+#         bench_file: Excel file containing candidate/bench data
+#         rrf_file: Excel file containing RRF (role requirement) data
+        
+#     Returns:
+#         AI-powered matching analysis with employee and RRF details
+#     """
+#     try:
+#         # Validate file types
+#         if not bench_file.filename.endswith(('.xlsx', '.xls')):
+#             raise HTTPException(status_code=400, detail="Bench file must be an Excel file (.xlsx or .xls)")
+        
+#         if not rrf_file.filename.endswith(('.xlsx', '.xls')):
+#             raise HTTPException(status_code=400, detail="RRF file must be an Excel file (.xlsx or .xls)")
+        
+#         # Read Excel files into memory
+#         bench_contents = pd.read_excel(bench_file.file)
+#         rrf_contents = pd.read_excel(rrf_file.file)
+#         # Create DataFrames from Excel files
+#         df_bench = pd.DataFrame(bench_contents)
+#         df_bench.columns = (
+#             df_bench.columns
+#               .str.strip()          # remove leading/trailing spaces
+#               .str.lower()          # convert to lowercase
+#               .str.replace(' ', '_')  # replace spaces with underscore
+#         )
+#         df_rrf = pd.DataFrame(rrf_contents)
+#         df_rrf.columns = (
+#             df_rrf.columns
+#             .str.strip()          # remove leading/trailing spaces
+#             .str.lower()          # convert to lowercase
+#             .str.replace(' ', '_')  # replace spaces with underscore
+#         )
+
+#         return {
+#             "success": True,
+#             "message": "Files processed successfully",
+#             "file_info": {
+#                 "bench_file": {
+#                     "filename": bench_file.filename,
+#                     "total_candidates": len(df_bench),
+#                     # "processed_candidates": len(df_bench_minimal)
+#                 },
+#                 "rrf_file": {
+#                     "filename": rrf_file.filename,
+#                     "total_rrfs": len(df_rrf),
+#                     # "processed_rrfs": len(df_rrf_minimal)
+#                 }
+#             },
+           
+#         }
+        
+#     except HTTPException:
+#         raise
+#     except pd.errors.EmptyDataError:
+#         raise HTTPException(status_code=400, detail="One or both files are empty or corrupted")
+#     except Exception as e:
+#         print(f"Error processing uploaded files: {e}")
+#         raise HTTPException(
+#             status_code=500, 
+#             detail=f"Error processing files: {str(e)}"
+#         )
+
+
+
 
 
 @app.get("/matching")

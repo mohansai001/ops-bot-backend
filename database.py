@@ -3,6 +3,7 @@ import json
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+import pandas as pd
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,7 +25,7 @@ def get_candidates_db():
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM bench WHERE allocation_status = 'BB';")
         candidates = cursor.fetchall()
-        print(candidates)
+        # print(candidates)
         dict_candidates=[]
         for candidate in candidates:
             values={
@@ -143,7 +144,7 @@ def list_retool_tables():
         tables = [row[0] for row in cursor.fetchall()]
         cursor.close()
         conn.close()
-        print(tables)
+        # print(tables)
         return tables
     except Exception as e:
         print(f"Error listing tables: {e}")
@@ -304,6 +305,265 @@ def insert_into_allocation_table(rrf_id: str, vam_id: str):
             cursor.close()
             conn.close()
 
+
+
+
+#function to insert values into bench table
+# def insert_into_bench_table(vamid, name, joining_date, grade, tsc, account, project, allocation_status, allocation_start_date, allocation_end_date, first_level_manager, designation, email, sub_dept, relieving_date, resigned_on, resignation_status, second_level_manager, current_skill, primary_skill, vam_exp, total_exp, account_summary, resourcing_unit, workspace):
+#     try:
+#         conn=connect_to_retool()
+#         cursor=conn.cursor()
+#         cursor.execute("INSERT INTO bench (vamid, name, joining_date, grade, tsc, account, project, allocation_status, allocation_start_date, allocation_end_date, first_level_manager, designation, email, sub_dept, relieving_date, resigned_on, resignation_status, second_level_manager, current_skill, primary_skill, vam_exp, total_exp, account_summary, resourcing_unit, workspace) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (vamid, name, joining_date, grade, tsc, account, project, allocation_status, allocation_start_date, allocation_end_date, first_level_manager, designation, email, sub_dept, relieving_date, resigned_on, resignation_status, second_level_manager, current_skill, primary_skill, vam_exp, total_exp, account_summary, resourcing_unit, workspace))
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+#         print(f"Inserted into bench table for VAM ID: {vamid}")
+#         return True
+#     except Exception as e:
+#         print(f"Error inserting into bench table: {e}")
+#         if 'conn' in locals():
+#             conn.rollback()
+#             cursor.close()
+#             conn.close()
+#         return False
+
+
+# def insert_into_bench_table(df_bench: pd.DataFrame):
+#     try:
+#         conn = connect_to_retool()
+#         cursor = conn.cursor()
+
+#         columns = [
+#             "vamid", "name", "joining_date", "grade", "tsc", "account",
+#             "project", "allocation_status", "allocation_start_date",
+#             "allocation_end_date", "first_level_manager", "designation",
+#             "email", "sub_dept", "relieving_date", "resigned_on",
+#             "resignation_status", "second_level_manager", "currentskill",
+#             "primary_skill", "vam_exp", "total_exp", "accountsummary",
+#             "resourcing_unit", "workspace"
+#         ]
+
+#         # Keep only required columns and order them correctly
+#         df_insert = df_bench[columns].where(pd.notnull(df_bench), None)
+
+#         placeholders = ", ".join(["%s"] * len(columns))
+#         column_names = ", ".join(columns)
+
+#         sql = f"""
+#             INSERT INTO bench ({column_names})
+#             VALUES ({placeholders})
+#         """
+
+#         data = [tuple(row) for row in df_insert.to_numpy()]
+
+#         cursor.executemany(sql, data)
+#         conn.commit()
+
+#         print(f"Inserted {len(data)} records into bench table")
+#         return True
+
+#     except Exception as e:
+#         print(f"Error inserting into bench table: {e}")
+#         if conn:
+#             conn.rollback()
+#         return False
+
+#     finally:
+#         if cursor:
+#             cursor.close()
+#         if conn:
+#             conn.close()
+
+
+def insert_into_bench_table(df_bench: pd.DataFrame):
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+
+        columns = [
+            "vamid", "name", "joining_date", "grade", "tsc", "account",
+            "project", "allocation_status", "allocation_start_date",
+            "allocation_end_date", "first_level_manager", "designation",
+            "email", "sub_dept", "relieving_date", "resigned_on",
+            "resignation_status", "second_level_manager", "currentskill",
+            "primary_skill", "vam_exp", "total_exp", "accountsummary",
+            "resourcing_unit", "workspace"
+        ]
+
+        # Create a clean copy
+        df_clean = df_bench.copy()
+
+        # Add missing columns
+        for col in columns:
+            if col not in df_clean.columns:
+                df_clean[col] = None
+
+        # Handle date columns
+        date_columns = ["joining_date", "allocation_start_date", "allocation_end_date", 
+                       "relieving_date", "resigned_on"]
+
+        for col in date_columns:
+            if col in df_clean.columns:
+                df_clean[col] = pd.to_datetime(df_clean[col], errors="coerce")
+                df_clean[col] = df_clean[col].apply(
+                    lambda x: None if pd.isna(x) else x.to_pydatetime()
+                )
+
+        # One-step null handling - replace all nulls with None
+        df_clean = df_clean.replace({pd.NaT: None, float("nan"): None})
+
+        # Select required columns
+        df_insert = df_clean[columns]
+
+        # Convert to records and then to tuples
+        records = df_insert.to_dict('records')
+        data = [tuple(record[col] for col in columns) for record in records]
+
+        placeholders = ", ".join(["%s"] * len(columns))
+        sql = f"INSERT INTO bench ({', '.join(columns)}) VALUES ({placeholders})"
+
+        cursor.executemany(sql, data)
+        conn.commit()
+
+        print(f"Inserted {len(data)} records into bench table")
+        return True
+
+    except Exception as e:
+        print(f"Error inserting into bench table: {e}")
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return False
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+
+
+#function to clear all the data in bench table
+def clear_bench_table():
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM bench;")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Cleared all data from bench table.")
+        return True
+    except Exception as e:
+        print(f"Error clearing bench table: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            return False
+
+
+
+#function to insert data into rrf table
+# def insert_into_rrf_table(account, rrf_id, created_on, required_by, pos_title, role, status, tag_comments, type, project_name):
+#     try:
+#         conn = connect_to_retool()
+#         cursor = conn.cursor()
+#         cursor.execute("INSERT INTO rrf (account, rrf_id, created_on, required_by, pos_title, role, status, tag_comments, type, project_name) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (account, rrf_id, created_on, required_by, pos_title, role, status, tag_comments, type, project_name))
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+#         print(f"Inserted into RRF table for RRF ID: {rrf_id}")
+#         return True
+#     except Exception as e:
+#         print(f"Error inserting into RRF table: {e}")
+#         if 'conn' in locals():
+#             conn.rollback()
+#             cursor.close()
+#             conn.close()
+#         return False
+
+
+def insert_into_rrf_table(df_rrf: pd.DataFrame):
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+
+        columns = [
+            "account", "rrf_id", "created_on", "required_by", "pos_title", 
+            "role", "status", "tag_comments", "type", "project_name"
+        ]
+
+        # Create a clean copy
+        df_clean = df_rrf.copy()
+
+        # Add missing columns with None values
+        for col in columns:
+            if col not in df_clean.columns:
+                df_clean[col] = None
+
+        # Handle date columns
+        date_columns = ["created_on", "required_by"]
+        
+        for col in date_columns:
+            if col in df_clean.columns:
+                df_clean[col] = pd.to_datetime(df_clean[col], errors="coerce")
+                df_clean[col] = df_clean[col].apply(
+                    lambda x: None if pd.isna(x) else x.to_pydatetime()
+                )
+
+        # Replace all nulls with None
+        df_clean = df_clean.replace({pd.NaT: None, float("nan"): None})
+        
+        # One-step null handling - replace all nulls with None
+        df_clean = df_clean.where(pd.notnull(df_clean), None)
+
+        # Select required columns
+        df_insert = df_clean[columns]
+
+        # Convert to records and then to tuples
+        records = df_insert.to_dict('records')
+        data = [tuple(record[col] for col in columns) for record in records]
+
+        placeholders = ", ".join(["%s"] * len(columns))
+        sql = f"INSERT INTO rrf ({', '.join(columns)}) VALUES ({placeholders})"
+
+        cursor.executemany(sql, data)
+        conn.commit()
+
+        print(f"Inserted {len(data)} records into RRF table")
+        return True
+
+    except Exception as e:
+        print(f"Error inserting into RRF table: {e}")
+        if 'conn' in locals() and conn:
+            conn.rollback()
+        return False
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        if 'conn' in locals() and conn:
+            conn.close()
+
+
+
+
+#function to clear data from rrf
+def clear_rrf_table():
+    try:
+        conn = connect_to_retool()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM rrf;")
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Cleared all data from rrf table.")
+        return True
+    except Exception as e:
+        print(f"Error clearing rrf table: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+            cursor.close()
+            conn.close()
+            return False
 
 if __name__ == "__main__":
     # Only run this when the script is executed directly, not when imported
