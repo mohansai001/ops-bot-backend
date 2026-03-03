@@ -319,15 +319,15 @@ async def upload_excel_files(
         )
 
 
+
 def find_matching_candidates(rrf_details):
     try:
         # Fetch data
         bench = get_candidates_db()
-       
 
         # Create DataFrames
         df1 = pd.DataFrame(bench)
-        df2 = pd.DataFrame(rrf_details, index=[0])  # Convert single RRF details to DataFrame
+        df2 = pd.DataFrame(rrf_details, index=[0])
 
         # Minimal columns for Gemini
         df1_update = df1[['vamid', 'grade', 'designation', 'current_skill', 'primary_skill']]
@@ -336,9 +336,29 @@ def find_matching_candidates(rrf_details):
         # Call Gemini
         gemini_response = call_gemini_api(df1_update, df2_update)
 
+        # Employee lookup by vamid
+        employee_lookup = (
+            df1
+            .set_index("vamid")
+            .to_dict(orient="index")
+        )
+
         # Find the specific RRF match
         for match in gemini_response.get("gemini_analysis", {}).get("matches", []):
             if match.get("rrf_id") == rrf_details.get("rrf_id"):
+
+                # Attach employee details to each recommended candidate
+                enriched_candidates = []
+                for candidate in match.get("recommended_candidates", []):
+                    vamid = candidate.get("vamid")
+
+                    enriched_candidates.append({
+                        **candidate,
+                        "employee_details": employee_lookup.get(vamid, {})
+                    })
+
+                match["recommended_candidates"] = enriched_candidates
+
                 return {
                     "ai_matching": match
                 }
@@ -348,6 +368,7 @@ def find_matching_candidates(rrf_details):
         return {
             "error": "An error occurred while processing the request"
         }
+
 
 
 @app.get("/matching")
@@ -404,25 +425,90 @@ def get_matching_candidates():
             "error": "An error occurred while processing the request"
         }
 
-@app.get("/match_candidate/{rrf_id}")
-def get_candidate_for_rrf(rrf_id: str):
+"""
+    Working code
+        """
+# @app.get("/match_candidate/{rrf_id}")
+# def get_candidate_for_rrf(rrf_id: str):
+#     try:
+#         rrf_details = get_rrf_by_id(rrf_id)
+#         if not rrf_details:
+#             return {
+#                 "message": f"No matching candidates found for RRF ID: {rrf_id}"
+#             }
+#         # If RRF details are found, proceed to find matching candidates
+#         matching_candidates = find_matching_candidates(rrf_details)
+        
+#         return {
+#             "ai_matching": matching_candidates
+#         }
+
+#     except Exception as e:
+#         print(f"Error in matching for RRF ID {rrf_id}: {e}")
+#         return {
+#             "error": "An error occurred while processing the request"
+#         }
+
+
+@app.get("/match_candidate/{rrf_ids}")
+def get_candidate_for_multiple_rrfs(rrf_ids: str):
+    """
+    Get matching candidates for multiple RRF IDs.
+    RRF IDs should be comma-separated in the URL.
+    Example: /match_candidate/POS-17169,POS-17717,POS-17760
+    """
     try:
-        rrf_details = get_rrf_by_id(rrf_id)
-        if not rrf_details:
-            return {
-                "message": f"No matching candidates found for RRF ID: {rrf_id}"
-            }
-        # If RRF details are found, proceed to find matching candidates
-        matching_candidates = find_matching_candidates(rrf_details)
+        # Split the comma-separated RRF IDs
+        rrf_id_list = [rrf_id.strip() for rrf_id in rrf_ids.split(',')]
+        
+        if not rrf_id_list or rrf_id_list == ['']:
+            raise HTTPException(status_code=400, detail="No RRF IDs provided")
+        
+        results = []
+        not_found_rrfs = []
+        
+        for rrf_id in rrf_id_list:
+            try:
+                rrf_details = get_rrf_by_id(rrf_id)
+                if not rrf_details:
+                    not_found_rrfs.append(rrf_id)
+                    continue
+                
+                # Find matching candidates for this RRF
+                matching_candidates = find_matching_candidates(rrf_details)
+                
+                results.append({
+                    "rrf_id": rrf_id,
+                    "rrf_details": rrf_details,
+                    "matching_result": matching_candidates
+                })
+                
+            except Exception as e:
+                print(f"Error processing RRF ID {rrf_id}: {e}")
+                results.append({
+                    "rrf_id": rrf_id,
+                    "error": f"Error processing RRF ID {rrf_id}: {str(e)}"
+                })
+        
         return {
-            "ai_matching": matching_candidates
+            "success": True,
+            "total_requested": len(rrf_id_list),
+            "total_processed": len(results),
+            "not_found_rrfs": not_found_rrfs,
+            "results": results
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error in matching for RRF ID {rrf_id}: {e}")
-        return {
-            "error": "An error occurred while processing the request"
-        }
+        print(f"Error in matching for RRF IDs {rrf_ids}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while processing the request"
+        )
+
+
+
 
 
 # Run the application
