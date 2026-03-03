@@ -10,7 +10,8 @@ from database import (connect_to_retool,
                       insert_into_bench_table,
                       insert_into_rrf_table,
                       clear_bench_table,
-                      clear_rrf_table)
+                      clear_rrf_table,
+                      get_rrf_by_id)
 import pandas as pd
 import google.generativeai as genai
 import os
@@ -235,124 +236,6 @@ def update_position(rrf_id: str, vam_id: str):
 
 
 
-
-
-# @app.get("/matching")
-# def get_matching_candidates():
-#     try:
-#         bench = get_candidates_db()
-#         rrf = get_rrf_details()
-#         df1=pd.DataFrame(bench)
-#         df2=pd.DataFrame(rrf)
-#         df1_update=df1[['vamid', 'grade', 'designation', 'current_skill', 'primary_skill']]
-#         df2=df2[['rrf_id', 'pos_title', 'role', 'account']]
-        
-#         # Call Gemini API for AI-powered matching
-#         gemini_response = call_gemini_api(df1_update, df2)
-        
-#         return {
-#             "ai_matching": gemini_response
-#         }
-#     except Exception as e:
-#         print(f"Error in matching: {e}")
-#         return {"error": "An error occurred while processing the request"}
-
-
-
-
-@app.post("/upload-files")
-# async def upload_excel_files(
-#     bench_file: Optional[UploadFile] = File(None, description="Bench Excel file"),
-#     rrf_file: Optional[UploadFile] = File(None, description="RRF Excel file")
-# ):
-#     """
-#     Upload and process bench and/or RRF Excel files for AI-powered matching.
-#     """
-#     try:
-#         df_bench = None
-#         df_rrf = None
-#         response_files = {}
-
-#         # ---------- Bench File ----------
-#         if bench_file:
-#             if not bench_file.filename.endswith(('.xlsx', '.xls')):
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail="Bench file must be an Excel file (.xlsx or .xls)"
-#                 )
-
-#             bench_contents = pd.read_excel(bench_file.file)
-#             df_bench = pd.DataFrame(bench_contents)
-
-#             df_bench.columns = (
-#                 df_bench.columns
-#                     .str.strip()
-#                     .str.lower()
-#                     .str.replace(r'[^a-z0-9]+', '_', regex=True)
-#             )
-#             bench_flag=clear_bench_table()
-#             if bench_flag:
-#                 response=insert_into_bench_table(df_bench)
-#             response_files["bench_file"] = {
-#                 "filename": bench_file.filename,
-#                 "columns": df_bench.columns.tolist(),
-#                 # "total_candidates": len(df_bench),
-#                 "insert_response": response
-#             }
-
-#         # ---------- RRF File ----------
-#         if rrf_file:
-#             if not rrf_file.filename.endswith(('.xlsx', '.xls')):
-#                 raise HTTPException(
-#                     status_code=400,
-#                     detail="RRF file must be an Excel file (.xlsx or .xls)"
-#                 )
-
-#             rrf_contents = pd.read_excel(rrf_file.file)
-#             df_rrf = pd.DataFrame(rrf_contents)
-
-#             df_rrf.columns = (
-#                 df_rrf.columns
-#                     .str.strip()
-#                     .str.lower()
-#                     .str.replace(r'[^a-z0-9]+', '_', regex=True)
-#             )
-#             rrf_flag=clear_rrf_table()
-#             if rrf_flag:
-#                 response=insert_into_rrf_table(df_rrf)
-#             response_files["rrf_file"] = {
-#                 "filename": rrf_file.filename,
-#                 "insert_response": response
-#             }
-
-#         # ---------- No files uploaded ----------
-#         if not bench_file and not rrf_file:
-#             raise HTTPException(
-#                 status_code=400,
-#                 detail="At least one file (bench or rrf) must be uploaded"
-#             )
-
-#         return {
-#             "success": True,
-#             "message": "File(s) processed successfully",
-#             "file_info": response_files
-#         }
-
-#     except HTTPException:
-#         raise
-#     except pd.errors.EmptyDataError:
-#         raise HTTPException(
-#             status_code=400,
-#             detail="One or more uploaded files are empty or corrupted"
-#         )
-#     except Exception as e:
-#         print(f"Error processing uploaded files: {e}")
-#         raise HTTPException(
-#             status_code=500,
-#             detail=f"Error processing files: {str(e)}"
-#         )
-
-
 @app.post("/upload-files")
 async def upload_excel_files(
     bench_file: Optional[UploadFile] = File(None),
@@ -444,78 +327,36 @@ async def upload_excel_files(
             detail=f"Error processing files: {str(e)}"
         )
 
-# async def upload_excel_files(
-#     bench_file: UploadFile = File(..., description="Bench Excel file"),
-#     rrf_file: UploadFile = File(..., description="RRF Excel file")
-# ):
-#     """
-#     Upload and process bench and RRF Excel files for AI-powered matching.
-    
-#     Args:
-#         bench_file: Excel file containing candidate/bench data
-#         rrf_file: Excel file containing RRF (role requirement) data
-        
-#     Returns:
-#         AI-powered matching analysis with employee and RRF details
-#     """
-#     try:
-#         # Validate file types
-#         if not bench_file.filename.endswith(('.xlsx', '.xls')):
-#             raise HTTPException(status_code=400, detail="Bench file must be an Excel file (.xlsx or .xls)")
-        
-#         if not rrf_file.filename.endswith(('.xlsx', '.xls')):
-#             raise HTTPException(status_code=400, detail="RRF file must be an Excel file (.xlsx or .xls)")
-        
-#         # Read Excel files into memory
-#         bench_contents = pd.read_excel(bench_file.file)
-#         rrf_contents = pd.read_excel(rrf_file.file)
-#         # Create DataFrames from Excel files
-#         df_bench = pd.DataFrame(bench_contents)
-#         df_bench.columns = (
-#             df_bench.columns
-#               .str.strip()          # remove leading/trailing spaces
-#               .str.lower()          # convert to lowercase
-#               .str.replace(' ', '_')  # replace spaces with underscore
-#         )
-#         df_rrf = pd.DataFrame(rrf_contents)
-#         df_rrf.columns = (
-#             df_rrf.columns
-#             .str.strip()          # remove leading/trailing spaces
-#             .str.lower()          # convert to lowercase
-#             .str.replace(' ', '_')  # replace spaces with underscore
-#         )
 
-#         return {
-#             "success": True,
-#             "message": "Files processed successfully",
-#             "file_info": {
-#                 "bench_file": {
-#                     "filename": bench_file.filename,
-#                     "total_candidates": len(df_bench),
-#                     # "processed_candidates": len(df_bench_minimal)
-#                 },
-#                 "rrf_file": {
-#                     "filename": rrf_file.filename,
-#                     "total_rrfs": len(df_rrf),
-#                     # "processed_rrfs": len(df_rrf_minimal)
-#                 }
-#             },
-           
-#         }
-        
-#     except HTTPException:
-#         raise
-#     except pd.errors.EmptyDataError:
-#         raise HTTPException(status_code=400, detail="One or both files are empty or corrupted")
-#     except Exception as e:
-#         print(f"Error processing uploaded files: {e}")
-#         raise HTTPException(
-#             status_code=500, 
-#             detail=f"Error processing files: {str(e)}"
-#         )
+def find_matching_candidates(rrf_details):
+    try:
+        # Fetch data
+        bench = get_candidates_db()
+       
 
+        # Create DataFrames
+        df1 = pd.DataFrame(bench)
+        df2 = pd.DataFrame(rrf_details, index=[0])  # Convert single RRF details to DataFrame
 
+        # Minimal columns for Gemini
+        df1_update = df1[['vamid', 'grade', 'designation', 'current_skill', 'primary_skill']]
+        df2_update = df2[['rrf_id', 'pos_title', 'role', 'account']]
 
+        # Call Gemini
+        gemini_response = call_gemini_api(df1_update, df2_update)
+
+        # Find the specific RRF match
+        for match in gemini_response.get("gemini_analysis", {}).get("matches", []):
+            if match.get("rrf_id") == rrf_details.get("rrf_id"):
+                return {
+                    "ai_matching": match
+                }
+
+    except Exception as e:
+        print(f"Error in finding matching candidates: {e}")
+        return {
+            "error": "An error occurred while processing the request"
+        }
 
 
 @app.get("/matching")
@@ -572,75 +413,25 @@ def get_matching_candidates():
             "error": "An error occurred while processing the request"
         }
 
-# def get_matching_candidates():
-#     try:
-#         bench = get_candidates_db()
-#         rrf = get_rrf_details()
+@app.get("/match_candidate/{rrf_id}")
+def get_candidate_for_rrf(rrf_id: str):
+    try:
+        rrf_details = get_rrf_by_id(rrf_id)
+        if not rrf_details:
+            return {
+                "message": f"No matching candidates found for RRF ID: {rrf_id}"
+            }
+        # If RRF details are found, proceed to find matching candidates
+        matching_candidates = find_matching_candidates(rrf_details)
+        return {
+            "ai_matching": matching_candidates
+        }
 
-#         df1 = pd.DataFrame(bench)
-#         df2 = pd.DataFrame(rrf)
-
-#         df1_update = df1[['vamid', 'grade', 'designation', 'current_skill', 'primary_skill']]
-#         df2 = df2[['rrf_id', 'pos_title', 'role', 'account']]
-
-#         # Call Gemini
-#         gemini_response = call_gemini_api(df1_update, df2)
-
-#         # Build employee lookup
-#         employee_lookup = (
-#             df1
-#             .set_index("vamid")
-#             .to_dict(orient="index")
-#         )
-
-#         rrf_lookup = (
-#             df2
-#             .set_index("rrf_id")
-#             .to_dict(orient="index")
-#         )
-
-#         # Build RRF lookup
-#         rrf_lookup = (
-#             df2
-#             .set_index("rrf_id")
-#             .to_dict(orient="index")
-#         )
-
-#         # Enrich response
-#         for match in gemini_response["gemini_analysis"]["matches"]:
-#             for candidate in match.get("recommended_candidates", []):
-#                 vamid = candidate.get("vamid")
-#                 candidate["employee_details"] = employee_lookup.get(vamid)
-
-#         return {
-#             "ai_matching": gemini_response
-#         }
-
-#     except Exception as e:
-#         print(f"Error in matching: {e}")
-#         return {"error": "An error occurred while processing the request"}
-
-
-# @app.post("/gemini/analyze")
-# async def analyze_with_gemini(prompt: str):
-#     """
-#     Direct endpoint to test Gemini API with custom prompts.
-#     """
-#     try:
-#         if not GEMINI_API_KEY:
-#             raise HTTPException(status_code=500, detail="Gemini API key not configured")
-        
-#         model = genai.GenerativeModel('gemini-pro')
-#         response = model.generate_content(prompt)
-        
-#         return {
-#             "success": True,
-#             "response": response.text,
-#             "prompt": prompt
-#         }
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error calling Gemini API: {str(e)}")
-
+    except Exception as e:
+        print(f"Error in matching for RRF ID {rrf_id}: {e}")
+        return {
+            "error": "An error occurred while processing the request"
+        }
 
 
 # Run the application

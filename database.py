@@ -308,73 +308,6 @@ def insert_into_allocation_table(rrf_id: str, vam_id: str):
 
 
 
-#function to insert values into bench table
-# def insert_into_bench_table(vamid, name, joining_date, grade, tsc, account, project, allocation_status, allocation_start_date, allocation_end_date, first_level_manager, designation, email, sub_dept, relieving_date, resigned_on, resignation_status, second_level_manager, current_skill, primary_skill, vam_exp, total_exp, account_summary, resourcing_unit, workspace):
-#     try:
-#         conn=connect_to_retool()
-#         cursor=conn.cursor()
-#         cursor.execute("INSERT INTO bench (vamid, name, joining_date, grade, tsc, account, project, allocation_status, allocation_start_date, allocation_end_date, first_level_manager, designation, email, sub_dept, relieving_date, resigned_on, resignation_status, second_level_manager, current_skill, primary_skill, vam_exp, total_exp, account_summary, resourcing_unit, workspace) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (vamid, name, joining_date, grade, tsc, account, project, allocation_status, allocation_start_date, allocation_end_date, first_level_manager, designation, email, sub_dept, relieving_date, resigned_on, resignation_status, second_level_manager, current_skill, primary_skill, vam_exp, total_exp, account_summary, resourcing_unit, workspace))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-#         print(f"Inserted into bench table for VAM ID: {vamid}")
-#         return True
-#     except Exception as e:
-#         print(f"Error inserting into bench table: {e}")
-#         if 'conn' in locals():
-#             conn.rollback()
-#             cursor.close()
-#             conn.close()
-#         return False
-
-
-# def insert_into_bench_table(df_bench: pd.DataFrame):
-#     try:
-#         conn = connect_to_retool()
-#         cursor = conn.cursor()
-
-#         columns = [
-#             "vamid", "name", "joining_date", "grade", "tsc", "account",
-#             "project", "allocation_status", "allocation_start_date",
-#             "allocation_end_date", "first_level_manager", "designation",
-#             "email", "sub_dept", "relieving_date", "resigned_on",
-#             "resignation_status", "second_level_manager", "currentskill",
-#             "primary_skill", "vam_exp", "total_exp", "accountsummary",
-#             "resourcing_unit", "workspace"
-#         ]
-
-#         # Keep only required columns and order them correctly
-#         df_insert = df_bench[columns].where(pd.notnull(df_bench), None)
-
-#         placeholders = ", ".join(["%s"] * len(columns))
-#         column_names = ", ".join(columns)
-
-#         sql = f"""
-#             INSERT INTO bench ({column_names})
-#             VALUES ({placeholders})
-#         """
-
-#         data = [tuple(row) for row in df_insert.to_numpy()]
-
-#         cursor.executemany(sql, data)
-#         conn.commit()
-
-#         print(f"Inserted {len(data)} records into bench table")
-#         return True
-
-#     except Exception as e:
-#         print(f"Error inserting into bench table: {e}")
-#         if conn:
-#             conn.rollback()
-#         return False
-
-#     finally:
-#         if cursor:
-#             cursor.close()
-#         if conn:
-#             conn.close()
-
-
 def insert_into_bench_table(df_bench: pd.DataFrame):
     try:
         conn = connect_to_retool()
@@ -462,24 +395,6 @@ def clear_bench_table():
 
 
 
-#function to insert data into rrf table
-# def insert_into_rrf_table(account, rrf_id, created_on, required_by, pos_title, role, status, tag_comments, type, project_name):
-#     try:
-#         conn = connect_to_retool()
-#         cursor = conn.cursor()
-#         cursor.execute("INSERT INTO rrf (account, rrf_id, created_on, required_by, pos_title, role, status, tag_comments, type, project_name) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);", (account, rrf_id, created_on, required_by, pos_title, role, status, tag_comments, type, project_name))
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-#         print(f"Inserted into RRF table for RRF ID: {rrf_id}")
-#         return True
-#     except Exception as e:
-#         print(f"Error inserting into RRF table: {e}")
-#         if 'conn' in locals():
-#             conn.rollback()
-#             cursor.close()
-#             conn.close()
-#         return False
 
 
 def insert_into_rrf_table(df_rrf: pd.DataFrame):
