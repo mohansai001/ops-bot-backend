@@ -18,7 +18,6 @@ import google.generativeai as genai
 import os
 import json
 from typing import Dict, Any,Optional
-import pandas as pd
 import io
 
 # from openai import AzureOpenAI
@@ -38,7 +37,7 @@ else:
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
+    allow_origins="*",  # Allows all origins
     allow_credentials=True,
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
